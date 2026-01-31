@@ -7,22 +7,18 @@ const util = require('util');
 const router = express.Router();
 
 // Get all products for user
-router.get('/', authMiddleware, (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
-    db.all(`
+    const products = await db`
       SELECT
         p.*,
         (SELECT COUNT(DISTINCT place_id) FROM usage_logs WHERE product_id = p.id) as user_count
       FROM products p
-      WHERE p.user_id = ?
+      WHERE p.user_id = ${req.user.id}
       ORDER BY p.created_at DESC
-    `, [req.user.id], (err, products) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Server error' });
-      }
-      res.json({ products });
-    });
+    `;
+
+    res.json({ products });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
@@ -30,7 +26,7 @@ router.get('/', authMiddleware, (req, res) => {
 });
 
 // Create product
-router.post('/', authMiddleware, (req, res) => {
+router.post('/', authMiddleware, async (req, res) => {
   try {
     const { name } = req.body;
 
@@ -40,25 +36,27 @@ router.post('/', authMiddleware, (req, res) => {
 
     const productKey = uuidv4();
 
-    db.run('INSERT INTO products (user_id, product_key, name) VALUES (?, ?, ?)', [req.user.id, productKey, name], function(err) {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Server error' });
-      }
+    // Insert product and get the inserted ID
+    const result = await db`
+      INSERT INTO products (user_id, product_key, name)
+      VALUES (${req.user.id}, ${productKey}, ${name})
+      RETURNING id
+    `;
 
-      // Generate the Lua script
-      const luaScript = generateLuaScript(productKey);
+    const productId = result[0].id;
 
-      res.json({
-        message: 'Product created',
-        product: {
-          id: this.lastID,
-          product_key: productKey,
-          name,
-          user_count: 0
-        },
-        luaScript
-      });
+    // Generate the Lua script
+    const luaScript = generateLuaScript(productKey);
+
+    res.json({
+      message: 'Product created',
+      product: {
+        id: productId,
+        product_key: productKey,
+        name,
+        user_count: 0
+      },
+      luaScript
     });
   } catch (error) {
     console.error(error);
@@ -67,21 +65,19 @@ router.post('/', authMiddleware, (req, res) => {
 });
 
 // Get Lua script for product
-router.get('/:id/script', authMiddleware, (req, res) => {
+router.get('/:id/script', authMiddleware, async (req, res) => {
   try {
-    db.get('SELECT * FROM products WHERE id = ? AND user_id = ?', [req.params.id, req.user.id], (err, product) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Server error' });
-      }
+    const products = await db`
+      SELECT * FROM products WHERE id = ${req.params.id} AND user_id = ${req.user.id}
+    `;
 
-      if (!product) {
-        return res.status(404).json({ error: 'product not found' });
-      }
+    if (products.length === 0) {
+      return res.status(404).json({ error: 'product not found' });
+    }
 
-      const luaScript = generateLuaScript(product.product_key);
-      res.json({ luaScript });
-    });
+    const product = products[0];
+    const luaScript = generateLuaScript(product.product_key);
+    res.json({ luaScript });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
@@ -89,43 +85,35 @@ router.get('/:id/script', authMiddleware, (req, res) => {
 });
 
 // Get users/logs for product
-router.get('/:id/users', authMiddleware, (req, res) => {
+router.get('/:id/users', authMiddleware, async (req, res) => {
   try {
-    db.get('SELECT * FROM products WHERE id = ? AND user_id = ?', [req.params.id, req.user.id], (err, product) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Server error' });
-      }
+    const products = await db`
+      SELECT * FROM products WHERE id = ${req.params.id} AND user_id = ${req.user.id}
+    `;
 
-      if (!product) {
-        return res.status(404).json({ error: 'product not found' });
-      }
+    if (products.length === 0) {
+      return res.status(404).json({ error: 'product not found' });
+    }
 
-      // Get unique place IDs with their latest log and whitelist status
-      db.all(`
-        SELECT
-          ul.place_id,
-          ul.game_name,
-          MAX(ul.timestamp) as last_seen,
-          w.status as whitelist_status,
-          COALESCE(w.is_active, 1) as is_active,
-          w.discord_id,
-          w.customer_name,
-          w.description
-        FROM usage_logs ul
-        LEFT JOIN whitelist w ON w.product_id = ul.product_id AND w.place_id = ul.place_id
-        WHERE ul.product_id = ?
-        GROUP BY ul.place_id
-        ORDER BY last_seen DESC
-      `, [req.params.id], (err, users) => {
-        if (err) {
-          console.error(err);
-          return res.status(500).json({ error: 'Server error' });
-        }
+    // Get unique place IDs with their latest log and whitelist status
+    const users = await db`
+      SELECT
+        ul.place_id,
+        ul.game_name,
+        MAX(ul.timestamp) as last_seen,
+        w.status as whitelist_status,
+        COALESCE(w.is_active, 1) as is_active,
+        w.discord_id,
+        w.customer_name,
+        w.description
+      FROM usage_logs ul
+      LEFT JOIN whitelist w ON w.product_id = ul.product_id AND w.place_id = ul.place_id
+      WHERE ul.product_id = ${req.params.id}
+      GROUP BY ul.place_id
+      ORDER BY last_seen DESC
+    `;
 
-        res.json({ users });
-      });
-    });
+    res.json({ users });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
@@ -133,7 +121,7 @@ router.get('/:id/users', authMiddleware, (req, res) => {
 });
 
 // Update product
-router.put('/:id', authMiddleware, (req, res) => {
+router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const { name } = req.body;
 
@@ -141,36 +129,28 @@ router.put('/:id', authMiddleware, (req, res) => {
       return res.status(400).json({ error: 'product name is required' });
     }
 
-    db.get('SELECT * FROM products WHERE id = ? AND user_id = ?', [req.params.id, req.user.id], (err, product) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Server error' });
+    const products = await db`
+      SELECT * FROM products WHERE id = ${req.params.id} AND user_id = ${req.user.id}
+    `;
+
+    if (products.length === 0) {
+      return res.status(404).json({ error: 'product not found' });
+    }
+
+    const product = products[0];
+
+    await db`
+      UPDATE products SET name = ${name.trim()} WHERE id = ${req.params.id} AND user_id = ${req.user.id}
+    `;
+
+    res.json({
+      message: 'Product updated',
+      product: {
+        id: req.params.id,
+        name: name.trim(),
+        product_key: product.product_key,
+        user_count: 0 // We'll calculate this properly later if needed
       }
-
-      if (!product) {
-        return res.status(404).json({ error: 'product not found' });
-      }
-
-      db.run('UPDATE products SET name = ? WHERE id = ? AND user_id = ?', [name.trim(), req.params.id, req.user.id], function(err) {
-        if (err) {
-          console.error(err);
-          return res.status(500).json({ error: 'Server error' });
-        }
-
-        if (this.changes === 0) {
-          return res.status(404).json({ error: 'product not found' });
-        }
-
-        res.json({
-          message: 'Product updated',
-          product: {
-            id: req.params.id,
-            name: name.trim(),
-            product_key: product.product_key,
-            user_count: product.user_count || 0
-          }
-        });
-      });
     });
   } catch (error) {
     console.error(error);
@@ -206,37 +186,23 @@ router.get('/:id', authMiddleware, (req, res) => {
 });
 
 // Delete product
-router.delete('/:id', authMiddleware, (req, res) => {
+router.delete('/:id', authMiddleware, async (req, res) => {
   try {
-    // Delete related data first
-    db.serialize(() => {
-      db.run('DELETE FROM usage_logs WHERE product_id = ?', [req.params.id], (err) => {
-        if (err) {
-          console.error(err);
-          return res.status(500).json({ error: 'Server error' });
-        }
+    // Check if product exists and belongs to user
+    const products = await db`
+      SELECT * FROM products WHERE id = ${req.params.id} AND user_id = ${req.user.id}
+    `;
 
-        db.run('DELETE FROM whitelist WHERE product_id = ?', [req.params.id], (err) => {
-          if (err) {
-            console.error(err);
-            return res.status(500).json({ error: 'Server error' });
-          }
+    if (products.length === 0) {
+      return res.status(404).json({ error: 'product not found' });
+    }
 
-          db.run('DELETE FROM products WHERE id = ? AND user_id = ?', [req.params.id, req.user.id], function(err) {
-            if (err) {
-              console.error(err);
-              return res.status(500).json({ error: 'Server error' });
-            }
+    // Delete related data first (foreign key constraints)
+    await db`DELETE FROM usage_logs WHERE product_id = ${req.params.id}`;
+    await db`DELETE FROM whitelist WHERE product_id = ${req.params.id}`;
+    await db`DELETE FROM products WHERE id = ${req.params.id} AND user_id = ${req.user.id}`;
 
-            if (this.changes === 0) {
-              return res.status(404).json({ error: 'product not found' });
-            }
-
-            res.json({ message: 'Product deleted' });
-          });
-        });
-      });
-    });
+    res.json({ message: 'Product deleted' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
