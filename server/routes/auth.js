@@ -17,40 +17,33 @@ router.post('/register', async (req, res) => {
     }
 
     // Check if user exists
-    db.get('SELECT * FROM users WHERE email = ? OR username = ?', [email, username], async (err, existingUser) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Server error' });
-      }
+    const existingUser = await db`
+      SELECT * FROM users WHERE email = ${email} OR username = ${username}
+    `;
 
-      if (existingUser) {
-        return res.status(400).json({ error: 'user already exists' });
-      }
+    if (existingUser.length > 0) {
+      return res.status(400).json({ error: 'user already exists' });
+    }
 
-      try {
-        // Hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Insert user
-        db.run('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [username, email, hashedPassword], function(err) {
-          if (err) {
-            console.error(err);
-            return res.status(500).json({ error: 'Server error' });
-          }
+    // Insert user and get the inserted ID
+    const result = await db`
+      INSERT INTO users (username, email, password)
+      VALUES (${username}, ${email}, ${hashedPassword})
+      RETURNING id
+    `;
 
-          // Generate token
-          const token = jwt.sign({ id: this.lastID, username, email }, JWT_SECRET, { expiresIn: '7d' });
+    const userId = result[0].id;
 
-          res.json({
-            message: 'Registration successful',
-            token,
-            user: { id: this.lastID, username, email }
-          });
-        });
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
-      }
+    // Generate token
+    const token = jwt.sign({ id: userId, username, email }, JWT_SECRET, { expiresIn: '7d' });
+
+    res.json({
+      message: 'Registration successful',
+      token,
+      user: { id: userId, username, email }
     });
   } catch (error) {
     console.error(error);
@@ -68,35 +61,29 @@ router.post('/login', async (req, res) => {
     }
 
     // Find user
-    db.get('SELECT * FROM users WHERE email = ?', [email], async (err, user) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Server error' });
-      }
+    const users = await db`
+      SELECT * FROM users WHERE email = ${email}
+    `;
 
-      if (!user) {
-        return res.status(400).json({ error: 'invalid credentials' });
-      }
+    if (users.length === 0) {
+      return res.status(400).json({ error: 'invalid credentials' });
+    }
 
-      try {
-        // Check password
-        const validPassword = await bcrypt.compare(password, user.password);
-        if (!validPassword) {
-          return res.status(400).json({ error: 'invalid credentials' });
-        }
+    const user = users[0];
 
-        // Generate token
-        const token = jwt.sign({ id: user.id, username: user.username, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+    // Check password
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(400).json({ error: 'invalid credentials' });
+    }
 
-        res.json({
-          message: 'Login successful',
-          token,
-          user: { id: user.id, username: user.username, email: user.email }
-        });
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
-      }
+    // Generate token
+    const token = jwt.sign({ id: user.id, username: user.username, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+
+    res.json({
+      message: 'Login successful',
+      token,
+      user: { id: user.id, username: user.username, email: user.email }
     });
   } catch (error) {
     console.error(error);
@@ -105,7 +92,7 @@ router.post('/login', async (req, res) => {
 });
 
 // Get current user
-router.get('/me', (req, res) => {
+router.get('/me', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
 
   if (!token) {
@@ -114,13 +101,15 @@ router.get('/me', (req, res) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    db.get('SELECT id, username, email, created_at FROM users WHERE id = ?', [decoded.id], (err, user) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Server error' });
-      }
-      res.json({ user });
-    });
+    const users = await db`
+      SELECT id, username, email, created_at FROM users WHERE id = ${decoded.id}
+    `;
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'user not found' });
+    }
+
+    res.json({ user: users[0] });
   } catch (error) {
     res.status(401).json({ error: 'invalid token' });
   }
