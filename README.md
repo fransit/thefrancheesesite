@@ -42,6 +42,23 @@ A modern licensing platform for Roblox developers to protect and track their scr
    http://localhost:3000
    ```
 
+## Deployment to Vercel
+
+### Database Setup (Required)
+This app requires a PostgreSQL database. We recommend using [Neon](https://neon.tech):
+
+1. Create a Neon account and project
+2. Get your database connection string
+3. Add `DATABASE_URL` environment variable in Vercel settings
+
+See [NEON_SETUP.md](NEON_SETUP.md) for detailed instructions.
+
+### Deploy Steps
+1. Push code to GitHub
+2. Connect repository to Vercel
+3. Add `DATABASE_URL` environment variable
+4. Deploy!
+
 ## Usage
 
 ### For Sellers/Developers
