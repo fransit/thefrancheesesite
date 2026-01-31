@@ -258,7 +258,7 @@ local Players = game:GetService("Players")
 
 -- Configuration
 local CONFIG = {
-    API_URL = "http://localhost:3000/api/tracking", -- Change to your server URL
+    API_URL = "https://tfs-hub.vercel.app/api/tracking", -- Change to your server URL
     PRODUCT_KEY = "${productKey}",
     CHECK_INTERVAL = 60, -- Check whitelist every 60 seconds
     KICK_MESSAGE = "This game is not authorized to use this product."
