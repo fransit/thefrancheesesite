@@ -65,8 +65,13 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'something went wrong!' });
 });
 
-app.listen(PORT, () => {
-  console.log(`
+// For Vercel deployment - export the app
+module.exports = app;
+
+// For local development
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
 ║   Cheese Secure - Roblox Licensing Platform 🧀    ║
@@ -81,5 +86,6 @@ app.listen(PORT, () => {
 ║   • /devlogs    - Activity Logs                           ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
-  `);
-});
+    `);
+  });
+}
