@@ -593,31 +593,106 @@ router.post('/log', async (req, res) => {
     const userAgent = req.get('User-Agent') || 'unknown';
 
     // Find product by key
-    db.get('SELECT * FROM products WHERE product_key = ?', [product_key], (err, product) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Server error' });
-      }
+    const products = await db`
+      SELECT * FROM products WHERE product_key = ${product_key}
+    `;
 
-      if (!product) {
-        return res.status(404).json({ error: 'invalid product key' });
-      }
+    if (products.length === 0) {
+      return res.status(404).json({ error: 'invalid product key' });
+    }
+
+    const product = products[0];
 
       // Fetch real game details from Roblox API
-      fetchRobloxGameDetails(place_id).then(gameDetails => {
-        const realGameName = gameDetails.name;
-        const finalGameName = realGameName !== 'Unknown Game' ? realGameName : (providedGameName || 'Unknown Game');
+      let gameDetails, realGameName, finalGameName;
+      try {
+        gameDetails = await fetchRobloxGameDetails(place_id);
+        realGameName = gameDetails.name;
+        finalGameName = realGameName !== 'Unknown Game' ? realGameName : (providedGameName || 'Unknown Game');
+      } catch (error) {
+        console.error('Error fetching game details:', error);
+        // Fallback to provided game name or unknown
+        finalGameName = providedGameName || 'Unknown Game';
+      }
 
-          // Log the usage with enhanced tracking data
-        const logData = {
-          product_id: product.id,
+      // Log the usage with final game name (either from API or fallback)
+      const logData = {
+        product_id: product.id,
+        place_id: place_id,
+        game_name: finalGameName,
+        roblox_user_id: robloxUser ? robloxUser.userId : (roblox_user_id || null),
+        roblox_username: robloxUser ? robloxUser.username : (roblox_username || null),
+        ip_address: ipAddress,
+        user_agent: userAgent
+      };
+
+      // Send analytics event
+      sendAnalyticsEvent(
+        process.env.GA_MEASUREMENT_ID,
+        process.env.GA_API_SECRET,
+        'script_usage',
+        {
+          product_key: product_key,
           place_id: place_id,
           game_name: finalGameName,
-          roblox_user_id: robloxUser ? robloxUser.userId : (roblox_user_id || null),
-          roblox_username: robloxUser ? robloxUser.username : (roblox_username || null),
-          ip_address: ipAddress,
-          user_agent: userAgent
-        };
+          verified_user: !!robloxUser,
+          custom_user_id: crypto.createHash('md5').update(ipAddress).digest('hex').substring(0, 8)
+        }
+      );
+
+      await db`
+        INSERT INTO usage_logs (product_id, place_id, game_name, roblox_user_id, roblox_username, ip_address, user_agent)
+        VALUES (${logData.product_id}, ${logData.place_id}, ${logData.game_name}, ${logData.roblox_user_id},
+         ${logData.roblox_username}, ${logData.ip_address}, ${logData.user_agent})
+      `;
+
+      // Check whitelist status
+      const whitelists = await db`
+        SELECT * FROM whitelist WHERE product_id = ${product.id} AND place_id = ${place_id}
+      `;
+
+      if (whitelists.length === 0) {
+        // Auto-create pending entry with final game name
+        await db`
+          INSERT INTO whitelist (product_id, place_id, game_name, status, is_active)
+          VALUES (${product.id}, ${place_id}, ${finalGameName}, 'pending', 1)
+        `;
+
+        res.json({
+          success: true,
+          whitelist_status: 'pending',
+          is_active: true,
+          game_name: finalGameName,
+          roblox_verified: !!robloxUser
+        });
+      } else {
+        // Update game name if it's still unknown or different
+        const whitelistEntry = whitelists[0];
+        if ((whitelistEntry.game_name === 'Unknown' || whitelistEntry.game_name === 'Unknown Game') && finalGameName !== 'Unknown Game') {
+          await db`
+            UPDATE whitelist SET game_name = ${finalGameName}
+            WHERE product_id = ${product.id} AND place_id = ${place_id}
+          `;
+        }
+
+        res.json({
+          success: true,
+          whitelist_status: whitelistEntry.status,
+          is_active: whitelistEntry.is_active === 1,
+          game_name: finalGameName,
+          roblox_verified: !!robloxUser
+        });
+      }
+
+      // Code removed - duplicate
+        product_id: product.id,
+        place_id: place_id,
+        game_name: finalGameName,
+        roblox_user_id: robloxUser ? robloxUser.userId : (roblox_user_id || null),
+        roblox_username: robloxUser ? robloxUser.username : (roblox_username || null),
+        ip_address: ipAddress,
+        user_agent: userAgent
+      };
 
         // Send analytics event
         sendAnalyticsEvent(
@@ -632,123 +707,54 @@ router.post('/log', async (req, res) => {
           }
         );
 
-        db.run(`INSERT INTO usage_logs (product_id, place_id, game_name, roblox_user_id, roblox_username, ip_address, user_agent)
-                VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [logData.product_id, logData.place_id, logData.game_name, logData.roblox_user_id,
-           logData.roblox_username, logData.ip_address, logData.user_agent], (err) => {
-          if (err) {
-            console.error(err);
-            return res.status(500).json({ error: 'Server error' });
+        await db`
+          INSERT INTO usage_logs (product_id, place_id, game_name, roblox_user_id, roblox_username, ip_address, user_agent)
+          VALUES (${logData.product_id}, ${logData.place_id}, ${logData.game_name}, ${logData.roblox_user_id},
+           ${logData.roblox_username}, ${logData.ip_address}, ${logData.user_agent})
+        `;
+
+        // Check whitelist status
+        const whitelists = await db`
+          SELECT * FROM whitelist WHERE product_id = ${product.id} AND place_id = ${place_id}
+        `;
+
+        if (whitelists.length === 0) {
+          // Auto-create pending entry with real game name
+          await db`
+            INSERT INTO whitelist (product_id, place_id, game_name, status, is_active)
+            VALUES (${product.id}, ${place_id}, ${finalGameName}, 'pending', 1)
+          `;
+
+          res.json({
+            success: true,
+            whitelist_status: 'pending',
+            is_active: true,
+            game_name: finalGameName,
+            roblox_verified: !!robloxUser
+          });
+        } else {
+          // Update game name if it's still unknown or different
+          const whitelistEntry = whitelists[0];
+          if ((whitelistEntry.game_name === 'Unknown' || whitelistEntry.game_name === 'Unknown Game') && finalGameName !== 'Unknown Game') {
+            await db`
+              UPDATE whitelist SET game_name = ${finalGameName}
+              WHERE product_id = ${product.id} AND place_id = ${place_id}
+            `;
           }
 
-          // Check whitelist status
-          db.get('SELECT * FROM whitelist WHERE product_id = ? AND place_id = ?', [product.id, place_id], (err, whitelist) => {
-            if (err) {
-              console.error(err);
-              return res.status(500).json({ error: 'Server error' });
-            }
-
-            if (!whitelist) {
-              // Auto-create pending entry with real game name
-              db.run('INSERT INTO whitelist (product_id, place_id, game_name, status, is_active) VALUES (?, ?, ?, ?, 1)', [product.id, place_id, finalGameName, 'pending'], (err) => {
-                if (err) {
-                  console.error(err);
-                  return res.status(500).json({ error: 'Server error' });
-                }
-                res.json({
-                  success: true,
-                  whitelist_status: 'pending',
-                  is_active: true,
-                  game_name: finalGameName,
-                  roblox_verified: !!robloxUser
-                });
-              });
-            } else {
-              // Update game name if it's still unknown or different
-              if ((whitelist.game_name === 'Unknown' || whitelist.game_name === 'Unknown Game') && finalGameName !== 'Unknown Game') {
-                db.run('UPDATE whitelist SET game_name = ? WHERE product_id = ? AND place_id = ?', [finalGameName, product.id, place_id], (err) => {
-                  if (err) {
-                    console.error(err);
-                    // Continue anyway
-                  }
-                });
-              }
-
-              res.json({
-                success: true,
-                whitelist_status: whitelist.status,
-                is_active: whitelist.is_active === 1,
-                game_name: finalGameName,
-                roblox_verified: !!robloxUser
-              });
-            }
+          res.json({
+            success: true,
+            whitelist_status: whitelistEntry.status,
+            is_active: whitelistEntry.is_active === 1,
+            game_name: finalGameName,
+            roblox_verified: !!robloxUser
           });
-        });
-      }).catch(error => {
-        console.error('Error fetching game details:', error);
-        // Fallback to provided game name or unknown
-        const fallbackGameName = providedGameName || 'Unknown Game';
-
-        // Log the usage with fallback name and enhanced tracking
-        const logData = {
-          product_id: product.id,
-          place_id: place_id,
-          game_name: fallbackGameName,
-          roblox_user_id: robloxUser ? robloxUser.userId : (roblox_user_id || null),
-          roblox_username: robloxUser ? robloxUser.username : (roblox_username || null),
-          ip_address: ipAddress,
-          user_agent: userAgent
-        };
-
-        db.run(`INSERT INTO usage_logs (product_id, place_id, game_name, roblox_user_id, roblox_username, ip_address, user_agent)
-                VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [logData.product_id, logData.place_id, logData.game_name, logData.roblox_user_id,
-           logData.roblox_username, logData.ip_address, logData.user_agent], (err) => {
-          if (err) {
-            console.error(err);
-            return res.status(500).json({ error: 'Server error' });
-          }
-
-          // Check whitelist status
-          db.get('SELECT * FROM whitelist WHERE product_id = ? AND place_id = ?', [product.id, place_id], (err, whitelist) => {
-            if (err) {
-              console.error(err);
-              return res.status(500).json({ error: 'Server error' });
-            }
-
-            if (!whitelist) {
-              // Auto-create pending entry with fallback name
-              db.run('INSERT INTO whitelist (product_id, place_id, game_name, status, is_active) VALUES (?, ?, ?, ?, 1)', [product.id, place_id, fallbackGameName, 'pending'], (err) => {
-                if (err) {
-                  console.error(err);
-                  return res.status(500).json({ error: 'Server error' });
-                }
-                res.json({
-                  success: true,
-                  whitelist_status: 'pending',
-                  is_active: true,
-                  game_name: fallbackGameName,
-                  roblox_verified: !!robloxUser
-                });
-              });
-            } else {
-              res.json({
-                success: true,
-                whitelist_status: whitelist.status,
-                is_active: whitelist.is_active === 1,
-                game_name: fallbackGameName,
-                roblox_verified: !!robloxUser
-              });
-            }
-          });
-        });
-      });
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
+        }
+      } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
 
 // Check license status (can be called by Roblox script)
 router.get('/check/:productKey/:placeId', (req, res) => {
