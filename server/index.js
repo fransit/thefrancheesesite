@@ -35,6 +35,10 @@ app.get('/login', (req, res) => {
 });
 
 // Routes for panel pages
+app.get('/panel', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/panel.html'));
+});
+
 app.get('/overview', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/panel.html'));
 });
