@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FranCheese Secure - Dashboard</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.jpg" type="image/jpeg">
+</head>
+<body>
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <h1><img src="/francheesepng.png" alt="FranCheese" style="width: 69px; height: 69px; object-fit: contain;">FranCheese</span></h1>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <a href="/overview" class="nav-item active" data-tab="overview">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+          Overview
+        </a>
+        <a href="/products" class="nav-item" data-tab="products">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+          Products
+        </a>
+        <a href="/devlogs" class="nav-item" data-tab="devlogs">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14,2 14,8 20,8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
+          DevLogs
+        </a>
+        <a href="#" class="nav-item" id="logoutBtn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+          Logout
+        </a>
+      </nav>
+      
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar" id="userAvatar">?</div>
+          <div class="user-details">
+            <div class="name" id="userName">Loading...</div>
+            <div class="email" id="userEmail">Loading...</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+    
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Overview Tab -->
+      <div id="overviewTab" class="tab-content fade-in">
+        <div class="page-header">
+          <h1>Welcome back! 👋</h1>
+          <p>Here's an overview of your licensing activity</p>
+        </div>
+        
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="label">Total Products</div>
+            <div class="value accent" id="statProducts">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Total Users</div>
+            <div class="value" id="statUsers">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Whitelisted</div>
+            <div class="value" id="statWhitelisted">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Pending</div>
+            <div class="value" id="statPending">0</div>
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="card-header">
+            <h2>Recent Activity</h2>
+          </div>
+          <div class="card-body">
+            <div id="recentActivity">
+              <div class="loading">
+                <div class="spinner"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Products Tab -->
+      <div id="productsTab" class="tab-content" style="display: none;">
+        <div class="page-header">
+          <h1>Products</h1>
+          <p>Manage your licensed products and scripts</p>
+        </div>
+        
+        <div class="card">
+          <div class="card-header">
+            <h2>Your Products</h2>
+            <button class="btn btn-primary btn-sm" id="addProductBtn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+              Add Product
+            </button>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <div id="productsList">
+              <div class="loading">
+                <div class="spinner"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DevLogs Tab -->
+      <div id="devlogsTab" class="tab-content" style="display: none;">
+        <div class="page-header">
+          <h1>DevLogs</h1>
+          <p>View all usage activity across your products</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Activity Logs</h2>
+            <div class="filters">
+              <select id="productFilter" class="form-select">
+                <option value="">All Products</option>
+              </select>
+              <select id="sortOrder" class="form-select">
+                <option value="timestamp DESC">Newest First</option>
+                <option value="timestamp ASC">Oldest First</option>
+                <option value="game_name ASC">Game Name A-Z</option>
+                <option value="game_name DESC">Game Name Z-A</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <div id="devlogsList">
+              <div class="loading">
+                <div class="spinner"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Product Detail Tab -->
+      <div id="productDetailTab" class="tab-content" style="display: none;">
+        <div class="page-header">
+          <h1 id="productDetailTitle">Product Details</h1>
+          <p>View users and manage whitelist</p>
+        </div>
+        
+        <div class="tabs">
+          <button class="tab active" data-subtab="users">Users</button>
+          <button class="tab" data-subtab="whitelist">Whitelist</button>
+          <button class="tab" data-subtab="script">Script</button>
+        </div>
+        
+        <!-- Users Subtab -->
+        <div id="usersSubtab" class="subtab-content">
+          <div class="card">
+            <div class="card-header">
+              <h2>Active Users</h2>
+              <button class="btn btn-secondary btn-sm" onclick="Panel.goBack()">
+                ← Back to Products
+              </button>
+            </div>
+            <div class="card-body">
+              <div id="usersList">
+                <div class="loading">
+                  <div class="spinner"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Whitelist Subtab -->
+        <div id="whitelistSubtab" class="subtab-content" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <h2>Whitelist Management</h2>
+              <button class="btn btn-secondary btn-sm" onclick="Panel.goBack()">
+                ← Back to Products
+              </button>
+            </div>
+            <div class="card-body">
+              <div class="whitelist-form">
+                <input type="text" id="whitelistPlaceId" placeholder="Place ID (e.g., 123456789)">
+                <input type="text" id="whitelistGameName" placeholder="Game Name">
+                <input type="text" id="whitelistDiscordId" placeholder="Discord ID (Optional)">
+                <input type="text" id="whitelistCustomerName" placeholder="Customer Name (Optional)">
+                <input type="text" id="whitelistDescription" placeholder="Description (Optional)">
+                <button class="btn btn-primary btn-sm" onclick="Panel.addToWhitelist()">
+                  Add to Whitelist
+                </button>
+              </div>
+              <div id="whitelistList">
+                <div class="loading">
+                  <div class="spinner"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Script Subtab -->
+        <div id="scriptSubtab" class="subtab-content" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <h2>Roblox Script</h2>
+              <button class="btn btn-secondary btn-sm" onclick="Panel.goBack()">
+                ← Back to Products
+              </button>
+            </div>
+            <div class="card-body">
+              <p style="margin-bottom: 16px; color: var(--text-muted);">
+                Copy this script and place it in <strong>ServerScriptService</strong> in Roblox Studio. 
+                Make sure to enable HTTP requests in Game Settings!
+              </p>
+              <div class="code-block">
+                <div class="code-header">
+                  <span>Lua Script</span>
+                  <button class="btn btn-secondary btn-sm" onclick="Panel.copyScript()">
+                    Copy Script
+                  </button>
+                </div>
+                <div class="code-content">
+                  <pre id="scriptContent">Loading...</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  
+  <!-- Add Product Modal -->
+  <div class="modal-overlay" id="addProductModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Create New Product</h3>
+        <button class="modal-close" onclick="Panel.closeModal('addProductModal')">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="productName">Product Name</label>
+          <input type="text" id="productName" placeholder="Enter product name">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="Panel.closeModal('addProductModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="Panel.createProduct()">Create Product</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Script Modal -->
+  <div class="modal-overlay" id="scriptModal">
+    <div class="modal" style="max-width: 700px;">
+      <div class="modal-header">
+        <h3>🎉 Product Created!</h3>
+        <button class="modal-close" onclick="Panel.closeModal('scriptModal')">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom: 16px; color: var(--text-muted);">
+          Here's your Roblox script. Place it in <strong>ServerScriptService</strong> and enable HTTP requests.
+        </p>
+        <div class="code-block">
+          <div class="code-header">
+            <span>Lua Script</span>
+            <button class="btn btn-secondary btn-sm" onclick="Panel.copyModalScript()">
+              Copy Script
+            </button>
+          </div>
+          <div class="code-content">
+            <pre id="modalScriptContent">Loading...</pre>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="Panel.closeModal('scriptModal')">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script src="/js/panel.js"></script>
+</body>
+</html>

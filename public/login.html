@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FranCheese Secure - Login</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="/favicon.jpg" type="image/jpeg">
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-box fade-in">
+      <div class="auth-logo">
+        <h1>FranCheese Secure</h1>
+        <p>Sign in to your account</p>
+      </div>
+
+      <div id="alert" class="alert" style="display: none;"></div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" name="email" placeholder="Enter your email" required>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" placeholder="Enter your password" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="submitBtn">
+          Sign In
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        Don't have an account? <a href="/register">Create one</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script>
+    // Check if already logged in
+    const token = localStorage.getItem('token');
+    if (token) {
+      window.location.href = '/panel';
+    }
+
+    console.log('Login page loaded');
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      console.log('Form submitted');
+
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const submitBtn = document.getElementById('submitBtn');
+      const alert = document.getElementById('alert');
+
+      console.log('Email:', email, 'Password length:', password.length);
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Signing in...';
+
+      try {
+        console.log('Making API call to /api/auth/login');
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email, password })
+        });
+
+        console.log('Response status:', response.status);
+        const data = await response.json();
+        console.log('Response data:', data);
+
+        if (response.ok) {
+          console.log('Login successful, redirecting to panel');
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          window.location.href = '/panel';
+        } else {
+          console.log('Login failed:', data.error);
+          alert.className = 'alert alert-error';
+          alert.textContent = data.error || 'Login failed';
+          alert.style.display = 'block';
+        }
+      } catch (error) {
+        console.error('Network error:', error);
+        alert.className = 'alert alert-error';
+        alert.textContent = 'Network error. Please try again.';
+        alert.style.display = 'block';
+      }
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Sign In';
+    });
+  </script>
+</body>
+</html>
